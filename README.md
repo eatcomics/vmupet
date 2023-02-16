@@ -1,14 +1,14 @@
 # vmupet
 
 A v-pet for the Sega VMU
-
-<details># first test
+### Roadmap
+## first test
 -Get a pet sprite rendered
 -Get the pet sprite to animate and move
 -Add a menu for feeding and training
 -Title screen?
 
-#Later
+## Later
 -Add some stats for the pet
 -Add ways to train
 -Add more animations
@@ -16,27 +16,8 @@ A v-pet for the Sega VMU
 -???
 -Profit
 
-#Way Later
--Multiplayer Fighting?
-<summary>Roadmap</summary>
-
-</details>Roadmap
-# first test
--Get a pet sprite rendered
--Get the pet sprite to animate and move
--Add a menu for feeding and training
--Title screen?
-
-#Later
--Add some stats for the pet
--Add ways to train
--Add more animations
--Get death working
--???
--Profit
-
-#Way Later
+## Way Later
 -Multiplayer Fighting?
 
-## License
+### License
 MIT
