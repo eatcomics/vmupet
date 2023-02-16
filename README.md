@@ -1,7 +1,7 @@
 # vmupet
 
 A v-pet for the Sega VMU
-#### Roadmap
+### Roadmap
 ## first test
 - Get a pet sprite rendered
 - Get the pet sprite to animate and move
