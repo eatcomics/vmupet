@@ -15,9 +15,10 @@ pet_x	= $30	; X position of the pet
 pet_y	= $31	; Y position of the pet
 gotbtns = $36	; Buttons currently being pressed
 time	= $37	; Time for animation of vpet sprite
+rseed	= $3c	; RNG seed
 
-b_sleep = $7	; Sleep button position
-b_mode	= $6	; Mode button position
+b_sleep = $7	; Sleep
+b_mode	= $6	; Mode
 b_b	= $5	; B
 b_a	= $4	; A
 b_r	= $3	; Right
@@ -63,11 +64,11 @@ __nop_vec:
     reti	; Return, used for unnecessary interrupts (ISRs)
 
     .org $130	; Firmware entry vector - Update system time
-__time_vec:
+__time1int:
     push ie
     clr1 ie, 7
     not1 ext, 0
-    jmpf __time_vec
+    jmpf __time1int
     pop ie
     reti
 
@@ -78,8 +79,8 @@ __goodbye:
 
 ;; VMS File Header
     .org $200			; Header starts at $200 for games
-    .text 16 "VMUPET"		; 16 bytes for file description
-    .text 32 "VMUPET FOR VMU"	; 32 bytes of file description (for dreamcast)
+    .text 16 "VMUPet"		; 16 bytes for file description
+    .text 32 "VMUPet for VMU"	; 32 bytes of file description (for dreamcast)
     .string 16 "" 		; Identifier of application that created the file (we don't need it)
 
     .include icon "./assets/icon.png" ; waterbear handles this nicely, nice clean code for us!
@@ -87,3 +88,46 @@ __goodbye:
 ;; Finally our code! Main entry point
     .org $680	; Main starts at $680
 __main:
+    clr1 ie, 7		; Disable interrupts until hardware is initialized
+    mov #$a1, ocr	; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
+    mov #$09, mcr	; Set up Mode Control Register
+    mov #$80, vccr	; Set up LCD Contrast Control Register
+    clr1 p3int, 0	; Cear bit 0 in p3int - For interrupts on button press
+    ; clr 1 p1, 7	; We dunno what this is for, I'm excluding for now, we'll dig into it later
+    mov #$FF, p3	; p3 are buttons - 0 for pressed 1 for unpressed
+
+    clr1 psw, 1		; Create random seed using current date/time of system	
+    ld $1c
+    xor $1d
+    set1 psw,1
+    st rseed
+
+    ; Indirect addressing time
+    clr1 psw, 4		; I dunno what this shit does, I should read, but too tired
+    clr1 psw, 3
+    mov #$82, $2
+    mov #2, xbnk
+    st @R2
+    set1 ie, 7		; Reenable interrupts now that hardware is initialized
+
+    call __pollbuttons	; Get the initial button state
+
+.main
+    ;; Here is where we'll draw the title screen, then we'll wait for a button press and jump to the real game loop
+    mov #<title1, trl
+    mov #>title1, trh
+    inc trl
+    inc trl
+    call __copytovf
+    call __commitvf
+
+.wait_for_start:
+    call __pollbuttons
+    bn v_btn, b_a, .wati_for_start
+
+    mv #18, vpet_x
+    mv #25, vpet_y
+
+.game_loop
+    ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
+
