@@ -89,7 +89,7 @@ __goodbye:
 
     .include icon "./assets/icon.png" ; waterbear handles this nicely, nice clean code for us!
 
-;; Finally our code! Main entry point
+;; Finally our game code! Main entry point
     .org $680	; Main starts at $680
 __main:
     clr1 ie, 7		; Disable interrupts until hardware is initialized
@@ -97,7 +97,7 @@ __main:
     mov #$09, mcr	; Set up Mode Control Register
     mov #$80, vccr	; Set up LCD Contrast Control Register
     clr1 p3int, 0	; Cear bit 0 in p3int - For interrupts on button press
-    ; clr 1 p1, 7	; We dunno what this is for, I'm excluding for now, we'll dig into it later
+    clr1 p1, 7		; Sets the sound output port
     mov #$FF, p3	; p3 are buttons - 0 for pressed 1 for unpressed
 
     clr1 psw, 1		; Create random seed using current date/time of system	
