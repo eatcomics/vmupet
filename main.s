@@ -8,14 +8,18 @@
 ;; No notes currently
 ;;
 
-.include "sfr.s"
+.include "sfr.i"
 
 ;; Game Variables
-pet_x	= $30	; X position of the pet
-pet_y	= $31	; Y position of the pet
-gotbtns = $36	; Buttons currently being pressed
-time	= $37	; Time for animation of vpet sprite
-rseed	= $3c	; RNG seed
+pet_x		= $30	; X position of the pet			1 byte
+pet_y		= $31	; Y position of the pet			1 byte
+pet_width	= $32	; Width of pet sprite			1 byte
+pet_height	= $33	; Height of pet sprite			1 byte
+pet_spr_addr	= $34	; Location of sprite in memory		2 bytes
+
+gotbtns 	= $36	; Buttons currently being pressed	1 byte
+time		= $37	; Time for animation of vpet sprite	? bytes
+rseed		= $3c	; RNG seed
 
 b_sleep = $7	; Sleep
 b_mode	= $6	; Mode
@@ -28,7 +32,7 @@ b_u	= $0	; Up
 
 ;; Reset and interrupt vectors
 .org $00	; Reset Vector
-jmpff __main	; Jump to vmupet entry point
+jmpf __main	; Jump to vmupet entry point
 
 .org $03	; INT0 (external)
 jmp __nop_vec
@@ -126,8 +130,19 @@ __main:
     bn v_btn, b_a, .wati_for_start
 
     mv #18, vpet_x
-    mv #25, vpet_y
+    mv #24, vpet_y
 
 .game_loop
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
+    call __pollbuttons
 
+.game_logic:
+    call __clearvf	; Clear the virtual framebuffer
+    call __drawpet	; Draw the pet to the virtual framebuffer
+    call __commitvf	; Actually commit sprites to virtual framebuffer
+
+__drawpet:
+    ld vpet_x		; Load accumulator with pet x
+    st b		; Store in b (for drawing)
+    mov #10, acc	; This has to do with the sprite width (I dunno yet, but we'll store in acc as a counter)
+    .include sprite "assets/pet.png"	; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
