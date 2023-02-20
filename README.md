@@ -3,10 +3,10 @@
 A v-pet for the Sega VMU
 ### Roadmap
 ## first test
-- Get a pet sprite rendered
+- (done) Get a pet sprite rendered
 - Get the pet sprite to animate and move
 - Add a menu for feeding and training
-- Title screen?
+- (haven't tested, but code in) Title screen?
 
 ## Later
 - Add some stats for the pet
