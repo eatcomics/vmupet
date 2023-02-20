@@ -26,8 +26,6 @@ time		= $37    ; Time for animation of vpet sprite    ? bytes
 rseed		= $3c    ; RNG seed
 
 title_spr_addr  = $8     ; Location of title in memory          2 bytes
-title_width     = $a     ; Width of title sprite                1 byte
-title_height    = $b     ; Height of title sprite               1 byte
 
 b_sleep = $7    ; Sleep
 b_mode	= $6    ; Mode
@@ -130,46 +128,6 @@ __main:
 .main
     ;; Here is where we'll draw the title screen, then we'll wait for a button press and jump to the real game loop
     
-    ;;;;;; Since this is the first time we're running into this, let's break it down, sexual style
-    ;; The VMU is wierd, and because of a bunch of nonsense with it, it uses 9 bits for addressing, it's a whole thing
-    ;; So because of that, there's some magic with things called banks. And to utilize this wonderful 9 bit addressing you have
-    ;; to use indirect addressing, so just keep that in mind when reading the comments below
-    ;; 
-    ;; This basically just gets a pointer to the sprite data, and sets the height and width of a sprite
-    mov    #<title1, acc       ; Load the lower byte of title1 data from the bank to the accumulator
-    st     trl                 ; Store that shit in the Table Reference Register lower byte
-    st     title_spr_addr      ; Store that in title_spr_addr as well, we'll pass this to LibPerspective to draw
-    mov    #>title1, acc       ; Now we repeat with the high byte of title1
-    st     trh                 ; Store that shit in the Table Reference Register upper byte
-    st     title_spr_addr+1    ; Also, store that high byte in the high byte of title_spr_addr
-    xor    acc                 ; Xor acc
-    ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
-    st     title_width         ; Store acc to title_width
-    mov    #1, acc             ; put 1 in acc
-    ldc                        ; Repeat the thing about adding acc with trl+trh
-    st     title_height        ; Store the results in title_height
-
-.wait_for_start:
-    call             __pollbuttons
-    clr1             ocr, 5
-    P_Draw_Sprite    title_spr_addr, 0, 0
-    P_Blit_Screen
-    
-    set1    ocr, 5
-
-    bn      v_btn, b_a, .wait_for_start
-
-    mov     #0, pet_x
-    mov     #0, pet_y
-
-.game_loop
-    ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
-    call __pollbuttons
-
-.game_logic:
-    call __drawpet    ; Draw the pet to the virtual framebuffer
-
-__drawpet:
     ;; Need to make sure I'm not doing these ops unnecessarily at some point
     ;; But will need to load correct sprite to display
     ld     pet_x; Load accumulator with pet x
@@ -188,7 +146,47 @@ __drawpet:
     ldc
     st     pet_height
 
+    ;;;;;; Since this is the first time we're running into this, let's break it down, sexual style
+    ;; The VMU is wierd, and because of a bunch of nonsense with it, it uses 9 bits for addressing, it's a whole thing
+    ;; So because of that, there's some magic with things called banks. And to utilize this wonderful 9 bit addressing you have
+    ;; to use indirect addressing, so just keep that in mind when reading the comments below
+    ;; 
+    ;; This basically just gets a pointer to the sprite data, and sets the height and width of a sprite
+    mov    #<title1, acc       ; Load the lower byte of title1 data from the bank to the accumulator
+    st     trl                 ; Store that shit in the Table Reference Register lower byte
+    st     title_spr_addr      ; Store that in title_spr_addr as well, we'll pass this to LibPerspective to draw
+    mov    #>title1, acc       ; Now we repeat with the high byte of title1
+    st     trh                 ; Store that shit in the Table Reference Register upper byte
+    st     title_spr_addr+1    ; Also, store that high byte in the high byte of title_spr_addr
+    xor    acc                 ; Xor acc
+    ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
+    ;st     title_width         ; Store acc to title_width
+    ;mov    #1, acc             ; put 1 in acc
+    ;ldc                        ; Repeat the thing about adding acc with trl+trh
+    ;st     title_height        ; Store the results in title_height
+
+.wait_for_start:
+    call             __pollbuttons
+    clr1             ocr, 5
+    P_Draw_Background    title_spr_addr
+    P_Blit_Screen
+    
+    set1    ocr, 5
+
+    bn      v_btn, b_a, .wait_for_start
+
+    mov     #0, pet_x
+    mov     #0, pet_y
+
+.game_loop
+    ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
+    call __pollbuttons
+    call __drawpet    ; Draw the pet to the virtual framebuffer
+    call .game_loop
+
+__drawpet:
     ;; This is libperspective drawing
+    P_Fill_Screen    P_WHITE
     P_Draw_Sprite    pet_spr_addr, pet_x, pet_y
     P_Blit_Screen
     ret
