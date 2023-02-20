@@ -4,9 +4,11 @@ A v-pet for the Sega VMU
 ### Roadmap
 ## first test
 - (done) Get a pet sprite rendered
+- Add sleep funcitonality
+- Get some pauses in the loops to let the cpu breathe
 - Get the pet sprite to animate and move
 - Add a menu for feeding and training
-- (haven't tested, but code in) Title screen?
+- (done) Title screen
 
 ## Later
 - Add some stats for the pet
