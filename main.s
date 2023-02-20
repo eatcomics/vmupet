@@ -115,29 +115,39 @@ __main:
     st rseed
 
     ; Indirect addressing time
-    clr1    psw, 4           ; I dunno what this shit does, I should read, but too tired
-    clr1    psw, 3
-    mov     #$82, $2
-    mov     #2, xbnk
-    st      @R2
+    ;; Shiro was using this as a virtual buffer so he could do a frame swap using xram
+    ;clr1    psw, 4
+    ;clr1    psw, 3
+    ;mov     #$82, $2
+    ;mov     #2, xbnk
+    ;st      @R2
+
+
     set1    ie, 7            ; Reenable interrupts now that hardware is initialized
 
     call    __pollbuttons    ; Get the initial button state
 
 .main
     ;; Here is where we'll draw the title screen, then we'll wait for a button press and jump to the real game loop
-    mov    #<title1, acc
-    st     trl
-    st     title_spr_addr
-    mov    #>title1, acc
-    st     trh
-    st     title_spr_addr+1
-    xor    acc
-    ldc
-    st     title_width
-    mov    #1, acc
-    ldc
-    st     title_height
+    
+    ;;;;;; Since this is the first time we're running into this, let's break it down, sexual style
+    ;; The VMU is wierd, and because of a bunch of nonsense with it, it uses 9 bits for addressing, it's a whole thing
+    ;; So because of that, there's some magic with things called banks. And to utilize this wonderful 9 bit addressing you have
+    ;; to use indirect addressing, so just keep that in mind when reading the comments below
+    ;; 
+    ;; This basically just gets a pointer to the sprite data, and sets the height and width of a sprite
+    mov    #<title1, acc       ; Load the lower byte of title1 data from the bank to the accumulator
+    st     trl                 ; Store that shit in the Table Reference Register lower byte
+    st     title_spr_addr      ; Store that in title_spr_addr as well, we'll pass this to LibPerspective to draw
+    mov    #>title1, acc       ; Now we repeat with the high byte of title1
+    st     trh                 ; Store that shit in the Table Reference Register upper byte
+    st     title_spr_addr+1    ; Also, store that high byte in the high byte of title_spr_addr
+    xor    acc                 ; Xor acc
+    ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
+    st     title_width         ; Store acc to title_width
+    mov    #1, acc             ; put 1 in acc
+    ldc                        ; Repeat the thing about adding acc with trl+trh
+    st     title_height        ; Store the results in title_height
 
 .wait_for_start:
     call             __pollbuttons
@@ -160,7 +170,7 @@ __main:
     call __drawpet    ; Draw the pet to the virtual framebuffer
 
 __drawpet:
-    ;; Need to make sure I'm not loading unnecessarily at some point
+    ;; Need to make sure I'm not doing these ops unnecessarily at some point
     ;; But will need to load correct sprite to display
     ld     pet_x; Load accumulator with pet x
     st     b                 ; Store in b (for drawing)
@@ -196,6 +206,10 @@ __pollButtons:
     st v_btn_chg
     pop acc
     ret
+
+;; Timing stuff in here somewhere
+
+;; Menu logic in here somewhere
 
 ;; When the VMU is plugged in to controller quit the game
 .quit:
