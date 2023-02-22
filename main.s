@@ -37,41 +37,40 @@ b_d	= $1    ; Down
 b_u	= $0    ; Up
 
 ;; Reset and interrupt vectors
-.org $00        ; Reset Vector
-jmpf __main     ; Jump to vmupet entry point
-
-.org $03        ; INT0 (external)
-jmp __nop_vec
-
-.org $0B        ; INT1 (external)
-jmp __nop_vec
-
-.org $13        ; INT2 (external) or T0L overflow
-jmp __nop_vec
-
-.org $1B        ; INT3 (external or base timer overflow
-jmp __nop_vec
-
-.org $23        ; T0H overflow
-jmp __nop_vec
-
-.org $2B        ; T1H or T1L overflow
-jmp __nop_vec
-
-.org $33        ; SIO0
-jmp __nop_vec
-
-.org $3B        ; SIO1
-jmp __nop_vec
-
-.org $43        ; RFB
-jmp __nop_vec
-
-.org $4B        ; P3
-jmp __nop_vec
-
-__nop_vec:
-    reti         ; Return, used for unnecessary interrupts (ISRs)
+    .org $00        ; Reset Vector
+    jmpf __main     ; Jump to vmupet entry point
+    
+    .org $03        ; INT0 (external)
+    reti
+    
+    .org $0B        ; INT1 (external)
+    reti
+    
+    .org $13        ; INT2 (external) or T0L overflow
+    reti
+    
+    .org $1B        ; INT3 (external or base timer overflow
+    jmpf __time1int
+    
+    .org $23        ; T0H overflow
+    reti
+    
+    .org $2B        ; T1H or T1L overflow
+    reti
+    
+    .org $33        ; SIO0
+    reti
+    
+    .org $3B        ; SIO1
+    reti
+    
+    .org $43        ; RFB
+    reti
+    
+    .org $4B        ; Clear Port 3 interrupts
+    clr1    p3int, 0
+    clr1    p3int, 1
+    reti
 
     .org $130    ; Firmware entry vector - Update system time
 __time1int:
@@ -98,30 +97,48 @@ __goodbye:
 ;; Finally our game code! Main entry point
     .org   $680	; Main starts at $680
 __main:
-    clr1 ie, 7            ; Disable interrupts until hardware is initialized
-    mov #$a1, ocr         ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
-    mov #$09, mcr         ; Set up Mode Control Register
-    mov #$80, vccr        ; Set up LCD Contrast Control Register
-    clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
-    clr1 p1, 7            ; Sets the sound output port
-    mov #$FF, p3          ; p3 are buttons - 0 for pressed 1 for unpressed
+    mov     #$a1, ocr
+    mov     #%00001001, mcr
+    mov     #$80, vccr
+    mov     #$20, acc
+    push    acc
 
-    clr1 psw, 1           ; Create random seed using current date/time of system	
-    ld $1c
-    xor $1d
-    set1 psw,1
-    st rseed
+    mov     #$ff, p3
+    mov     #$80, sp
+    mov     #%10000000, ie
+    clr1    psw, 3
+    clr1    psw, 4
+    mov     #$05, acc
+    push    acc
 
-    ; Indirect addressing time
-    ;; Shiro was using this as a virtual buffer so he could do a frame swap using xram
-    ;clr1    psw, 4
-    ;clr1    psw, 3
-    ;mov     #$82, $2
-    ;mov     #2, xbnk
-    ;st      @R2
+    mov     #$80, p1fcr
+    clr1    p1, 7
+    mov     #$80, p1ddr
 
-
-    set1    ie, 7            ; Reenable interrupts now that hardware is initialized
+;    clr1 ie, 7            ; Disable interrupts until hardware is initialized
+;    mov #$a1, ocr         ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
+;    mov #$09, mcr         ; Set up Mode Control Register
+;    mov #$80, vccr        ; Set up LCD Contrast Control Register
+;    clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
+;    clr1 p1, 7            ; Sets the sound output port
+;    mov #$FF, p3          ; p3 are buttons - 0 for pressed 1 for unpressed
+;
+;    clr1 psw, 1           ; Create random seed using current date/time of system	
+;    ld $1c
+;    xor $1d
+;    set1 psw,1
+;    st rseed
+;
+;    ; Indirect addressing time
+;    ;; Shiro was using this as a virtual buffer so he could do a frame swap using xram
+;    clr1    psw, 4
+;    clr1    psw, 3
+;    mov     #$82, $2
+;    mov     #2, xbnk
+;    st      @R2
+;
+;
+;    set1    ie, 7            ; Reenable interrupts now that hardware is initialized
 
     call    __pollbuttons    ; Get the initial button state
 
@@ -160,10 +177,6 @@ __main:
     st     title_spr_addr+1    ; Also, store that high byte in the high byte of title_spr_addr
     xor    acc                 ; Xor acc
     ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
-    ;st     title_width         ; Store acc to title_width
-    ;mov    #1, acc             ; put 1 in acc
-    ;ldc                        ; Repeat the thing about adding acc with trl+trh
-    ;st     title_height        ; Store the results in title_height
 
 .wait_for_start:
     call             __pollbuttons
@@ -191,7 +204,7 @@ __drawpet:
     P_Blit_Screen
     ret
     
-__pollButtons:
+__pollbuttons:
     bp p7, 0, .quit     ; When the VMU is plugged into controller, this bit goes high
     push acc            ; Save acc so we can use it for reading and storing
     ld v_btn            ; The current set of buttons is now the old set
@@ -221,7 +234,6 @@ title1:
     .include sprite "assets/title1.png" ; Waterbear loading up the title screen png
     
 pet_spr: 
-    ;; This should be logic to decide what sprite to draw tbh, I think libperspective clears screen?
     .include sprite "assets/pet.png"    ; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
 
-
+    .cnop 0, $200    ; Pad binary to an even number of blocks
