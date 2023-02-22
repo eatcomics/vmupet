@@ -194,17 +194,29 @@ __pollbuttons:
     st v_btn_old
     ld p3               ; Read value of port 3 (buttons)
     bn acc, 6, .quit    ; Bit 6 is the mode button, it will quit
+    call acc, 7, .sleep
     xor #$FF            ; Invert button state, so 1=Pressed 0=Unpressed
     st v_btn            ; The current set of buttons is now the new set just read
     xor v_btn_old       ; XOR the new set with the old set, this will give us changed buttons
     st v_btn_chg
     pop acc
     ret
+    
 
 ;; Timing stuff in here somewhere
 
 ;; Menu logic in here somewhere
 
+;; Sleep interrupt
+.sleep
+    ;; set PCON bit to 1 so the system goes into halt mode
+    push acc
+    ld  pcon
+    mov #1, acc
+    st  pcon
+    pop acc
+    ret
+    
 ;; When the VMU is plugged in to controller quit the game
 .quit:
     jmp __goodbye
