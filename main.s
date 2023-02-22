@@ -95,50 +95,32 @@ __goodbye:
     .include icon "./assets/icon.png" ; Waterbear handles this nicely, nice clean code for us!
 
 ;; Finally our game code! Main entry point
-    .org   $680	; Main starts at $680
+    .org   $54B	          ; Main starts at $680
 __main:
-    mov     #$a1, ocr
-    mov     #%00001001, mcr
-    mov     #$80, vccr
-    mov     #$20, acc
-    push    acc
+    clr1 ie, 7            ; Disable interrupts until hardware is initialized
+    mov #$a1, ocr         ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
+    mov #$09, mcr         ; Set up Mode Control Register
+    mov #$80, vccr        ; Set up LCD Contrast Control Register
+    clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
+    clr1 p1, 7            ; Sets the sound output port
+    mov #$FF, p3          ; p3 are buttons - 0 for pressed 1 for unpressed
 
-    mov     #$ff, p3
-    mov     #$80, sp
-    mov     #%10000000, ie
-    clr1    psw, 3
-    clr1    psw, 4
-    mov     #$05, acc
-    push    acc
-
-    mov     #$80, p1fcr
-    clr1    p1, 7
-    mov     #$80, p1ddr
-
-;    clr1 ie, 7            ; Disable interrupts until hardware is initialized
-;    mov #$a1, ocr         ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
-;    mov #$09, mcr         ; Set up Mode Control Register
-;    mov #$80, vccr        ; Set up LCD Contrast Control Register
-;    clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
-;    clr1 p1, 7            ; Sets the sound output port
-;    mov #$FF, p3          ; p3 are buttons - 0 for pressed 1 for unpressed
-;
 ;    clr1 psw, 1           ; Create random seed using current date/time of system	
 ;    ld $1c
 ;    xor $1d
 ;    set1 psw,1
 ;    st rseed
-;
-;    ; Indirect addressing time
-;    ;; Shiro was using this as a virtual buffer so he could do a frame swap using xram
-;    clr1    psw, 4
-;    clr1    psw, 3
-;    mov     #$82, $2
-;    mov     #2, xbnk
-;    st      @R2
-;
-;
-;    set1    ie, 7            ; Reenable interrupts now that hardware is initialized
+
+    ; Indirect addressing time
+    ;; Shiro was using this as a virtual buffer so he could do a frame swap using xram
+    clr1    psw, 4
+    clr1    psw, 3
+    mov     #$82, $2
+    mov     #2, xbnk
+    st      @R2
+
+
+    set1    ie, 7            ; Reenable interrupts now that hardware is initialized
 
     call    __pollbuttons    ; Get the initial button state
 
@@ -147,9 +129,9 @@ __main:
     
     ;; Need to make sure I'm not doing these ops unnecessarily at some point
     ;; But will need to load correct sprite to display
-    ld     pet_x; Load accumulator with pet x
-    st     b                 ; Store in b (for drawing)
-    mov    #20, acc          ; Sprite width is 32
+    ;ld     pet_x; Load accumulator with pet x
+    ;st     b                 ; Store in b (for drawing)
+    ;mov    #20, acc          ; Sprite width is 32
     mov    #<pet_spr, acc    ; This is all indirect addressing magic, I'll read about
     st     trl               ;     someday soon
     st     pet_spr_addr
@@ -195,7 +177,7 @@ __main:
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
     call __pollbuttons
     call __drawpet    ; Draw the pet to the virtual framebuffer
-    call .game_loop
+    jmpf .game_loop
 
 __drawpet:
     ;; This is libperspective drawing
