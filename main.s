@@ -160,11 +160,12 @@ __main:
     xor    acc                 ; Xor acc
     ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
 
+    P_Draw_Background    title_spr_addr
+    P_Blit_Screen
+
 .wait_for_start:
     call             __pollbuttons
     clr1             ocr, 5
-    P_Draw_Background    title_spr_addr
-    P_Blit_Screen
     
     set1    ocr, 5
 
