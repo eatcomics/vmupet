@@ -72,16 +72,13 @@ b_u	= $0    ; Up
     clr1    p3int, 1
     reti
 
-    .org $130    ; Firmware entry vector - Update system time
+.org $130    ; Firmware entry vector - Update system time
 __time1int:
     push    ie
     clr1    ie, 7
     not1    ext, 0
     jmpf    __time1int
     pop     ie
-    reti
-
-    .org $145
     reti
 
     .org $1F0    ; Firmware entry vector - Leave game mode
@@ -127,7 +124,6 @@ __main:
 
     call    __pollbuttons    ; Get the initial button state
 
-.main
     ;; Here is where we'll draw the title screen, then we'll wait for a button press and jump to the real game loop
     
     ;; Need to make sure I'm not doing these ops unnecessarily at some point
@@ -177,7 +173,13 @@ __main:
 .game_loop:
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
     call __pollbuttons
+    bpc v_btn, b_sleep, .sleep
     call __drawpet    ; Draw the pet to the virtual framebuffer
+    jmp .game_loop
+
+.sleep:
+    not1 ext, 0
+    jmpf $140
     jmp .game_loop
 
 __drawpet:
@@ -194,18 +196,12 @@ __pollbuttons:
     st v_btn_old
     ld p3               ; Read value of port 3 (buttons)
     bn acc, 6, .quit    ; Bit 6 is the mode button, it will quit
-    bn acc, 7, .sleep
     xor #$FF            ; Invert button state, so 1=Pressed 0=Unpressed
     st v_btn            ; The current set of buttons is now the new set just read
     xor v_btn_old       ; XOR the new set with the old set, this will give us changed buttons
     st v_btn_chg
     pop acc
     ret
-
-.sleep:
-    clr1 ext, 0
-    jmpf $140
-    br __pollbuttons
 
 ;; Timing stuff in here somewhere
 
@@ -222,6 +218,6 @@ title1:
     .include sprite "assets/title1.png" ; Waterbear loading up the title screen png
     
 pet_spr: 
-    .include sprite "assets/pet.png"    ; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
+    .include sprite "assets/baby.png"    ; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
 
     .cnop 0, $200    ; Pad binary to an even number of blocks
