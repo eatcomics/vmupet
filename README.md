@@ -1,5 +1,9 @@
 # vmupet
 
+This branch is here because I'm having some weird behavior with libperspective
+using P_Draw_Sprite and having some x_position values causes the image to be cut off
+y values work fine
+
 A v-pet for the Sega VMU
 ### Roadmap
 ## first test
