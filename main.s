@@ -81,7 +81,10 @@ __time1int:
     pop     ie
     reti
 
-    .org $1F0    ; Frimware entry vector - Leave game mode
+    .org $145
+    reti
+
+    .org $1F0    ; Firmware entry vector - Leave game mode
 __goodbye:
     not1    ext, 0
     jmpf    __goodbye
@@ -95,7 +98,7 @@ __goodbye:
     .include icon "./assets/icon.png" ; Waterbear handles this nicely, nice clean code for us!
 
 ;; Finally our game code! Main entry point
-    .org   $54B	          ; Main starts at $680
+    .org   $54B	          ; Main starts at $54B if you have one title screen, $680 if two
 __main:
     clr1 ie, 7            ; Disable interrupts until hardware is initialized
     mov #$a1, ocr         ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
@@ -113,11 +116,11 @@ __main:
 
     ; Indirect addressing time
     ;; Shiro was using this as a virtual buffer so he could do a frame swap using xram
-    clr1    psw, 4
-    clr1    psw, 3
-    mov     #$82, $2
-    mov     #2, xbnk
-    st      @R2
+    ;clr1    psw, 4
+    ;clr1    psw, 3
+    ;mov     #$82, $2
+    ;mov     #2, xbnk
+    ;st      @R2
 
 
     set1    ie, 7            ; Reenable interrupts now that hardware is initialized
@@ -129,9 +132,6 @@ __main:
     
     ;; Need to make sure I'm not doing these ops unnecessarily at some point
     ;; But will need to load correct sprite to display
-    ;ld     pet_x; Load accumulator with pet x
-    ;st     b                 ; Store in b (for drawing)
-    ;mov    #20, acc          ; Sprite width is 32
     mov    #<pet_spr, acc    ; This is all indirect addressing magic, I'll read about
     st     trl               ;     someday soon
     st     pet_spr_addr
@@ -174,11 +174,11 @@ __main:
     mov     #0, pet_x
     mov     #0, pet_y
 
-.game_loop
+.game_loop:
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
     call __pollbuttons
     call __drawpet    ; Draw the pet to the virtual framebuffer
-    jmpf .game_loop
+    jmp .game_loop
 
 __drawpet:
     ;; This is libperspective drawing
@@ -186,7 +186,7 @@ __drawpet:
     P_Draw_Sprite    pet_spr_addr, pet_x, pet_y
     P_Blit_Screen
     ret
-    
+   
 __pollbuttons:
     bp p7, 0, .quit     ; When the VMU is plugged into controller, this bit goes high
     push acc            ; Save acc so we can use it for reading and storing
@@ -194,30 +194,23 @@ __pollbuttons:
     st v_btn_old
     ld p3               ; Read value of port 3 (buttons)
     bn acc, 6, .quit    ; Bit 6 is the mode button, it will quit
-    call acc, 7, .sleep
+    bn acc, 7, .sleep
     xor #$FF            ; Invert button state, so 1=Pressed 0=Unpressed
     st v_btn            ; The current set of buttons is now the new set just read
     xor v_btn_old       ; XOR the new set with the old set, this will give us changed buttons
     st v_btn_chg
     pop acc
     ret
-    
+
+.sleep:
+    clr1 ext, 0
+    jmpf $140
+    br __pollbuttons
 
 ;; Timing stuff in here somewhere
 
 ;; Menu logic in here somewhere
 
-;; Sleep interrupt
-.sleep
-    ;; set PCON bit to 1 so the system goes into halt mode
-    push acc
-    ld  pcon
-    mov #1, acc
-    st  pcon
-    pop acc
-    ret
-    
-;; When the VMU is plugged in to controller quit the game
 .quit:
     jmp __goodbye
 
