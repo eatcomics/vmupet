@@ -9,7 +9,6 @@
 ;;
 
 ;; TODO
-;; Create branch for messing with Kresna's libperspective drawing issue
 ;; In main branch stop using libperspective and the other one, just use shiro's input code and drawing code
 ;; Move those into their own file along with sleep and quit
 ;; Move sprite every frame
