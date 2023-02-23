@@ -8,33 +8,30 @@
 ;; No notes currently
 ;;
 
+;; TODO
+;; Create branch for messing with Kresna's libperspective drawing issue
+;; In main branch stop using libperspective and the other one, just use shiro's input code and drawing code
+;; Move those into their own file along with sleep and quit
+;; Move sprite every frame
+;; Change sprite based on direction and walking
+
 .include "lib/sfr.i"
 
 ;; Game Variables
-v_btn		= $10    ; Current active state of buttons
-v_btn_old	= $11    ; Previous state of buttons
-v_btn_chg	= $12    ; Which buttons have chnaged from v_btn_old to v_btn
+pet_x		= $16    ; X position of the pet                1 byte
+pet_y		= $11    ; Y position of the pet                1 byte
+pet_width	= $12    ; Width of pet sprite                  1 byte
+pet_height	= $13    ; Height of pet sprite                 1 byte
+pet_spr_addr	= $14    ; Location of sprite in memory         2 bytes
 
-pet_x		= $30    ; X position of the pet                1 byte
-pet_y		= $31    ; Y position of the pet                1 byte
-pet_width	= $32    ; Width of pet sprite                  1 byte
-pet_height	= $33    ; Height of pet sprite                 1 byte
-pet_spr_addr	= $34    ; Location of sprite in memory         2 bytes
-
-gotbtns 	= $36    ; Buttons currently being pressed      1 byte
 time		= $37    ; Time for animation of vpet sprite    ? bytes
 rseed		= $3c    ; RNG seed
 
 title_spr_addr  = $8     ; Location of title in memory          2 bytes
 
-b_sleep = $7    ; Sleep
-b_mode	= $6    ; Mode
-b_b	= $5    ; B
-b_a	= $4    ; A
-b_r	= $3    ; Right
-b_l	= $2    ; Left
-b_d	= $1    ; Down
-b_u	= $0    ; Up
+;; Libkcommon uses these
+p3_pressed              =       $4      ; 1 byte
+p3_last_input           =       $5      ; 1 byte
 
 ;; Reset and interrupt vectors
     .org $00        ; Reset Vector
@@ -82,9 +79,9 @@ __time1int:
     reti
 
     .org $1F0    ; Firmware entry vector - Leave game mode
-__goodbye:
+goodbye:
     not1    ext, 0
-    jmpf    __goodbye
+    jmpf    goodbye
 
 ;; VMS File Header
     .org    $200                ; Header starts at $200 for games
@@ -122,25 +119,9 @@ __main:
 
     set1    ie, 7            ; Reenable interrupts now that hardware is initialized
 
-    call    __pollbuttons    ; Get the initial button state
+    call   Get_Input         ; Get the initial button state
 
     ;; Here is where we'll draw the title screen, then we'll wait for a button press and jump to the real game loop
-    
-    ;; Need to make sure I'm not doing these ops unnecessarily at some point
-    ;; But will need to load correct sprite to display
-    mov    #<pet_spr, acc    ; This is all indirect addressing magic, I'll read about
-    st     trl               ;     someday soon
-    st     pet_spr_addr
-    mov    #>pet_spr, acc
-    st     trh
-    st     pet_spr_addr+1
-    xor    acc
-    ldc
-    st     pet_width
-    mov    #1, acc
-    ldc
-    st     pet_height
-
     ;;;;;; Since this is the first time we're running into this, let's break it down, sexual style
     ;; The VMU is wierd, and because of a bunch of nonsense with it, it uses 9 bits for addressing, it's a whole thing
     ;; So because of that, there's some magic with things called banks. And to utilize this wonderful 9 bit addressing you have
@@ -156,31 +137,49 @@ __main:
     xor    acc                 ; Xor acc
     ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
 
+    mov    #<pet_spr, acc    ; This is all indirect addressing magic, I'll read about
+    st     trl               ;     someday soon
+    st     pet_spr_addr
+    mov    #>pet_spr, acc
+    st     trh
+    st     pet_spr_addr+1
+    xor    acc
+    ldc
+    mov    #16, pet_width
+    mov    #16, pet_height
+
+    ;; Actually draw and render the title sprite
     P_Draw_Background    title_spr_addr
     P_Blit_Screen
 
 .wait_for_start:
-    call             __pollbuttons
-    clr1             ocr, 5
+    call    Get_Input
+    clr1    ocr, 5
     
     set1    ocr, 5
+    
+    mov     #Button_A, acc
+    call    Check_Button_Pressed
+    bz      .wait_for_start
 
-    bn      v_btn, b_a, .wait_for_start
-
-    mov     #0, pet_x
-    mov     #0, pet_y
+    mov     #1, pet_x
+    mov     #5, pet_y
 
 .game_loop:
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
-    call __pollbuttons
-    bpc v_btn, b_sleep, .sleep
+    call __input
+    set1 pcon, 0      ; Wait for an intterupt (Timer counts)
     call __drawpet    ; Draw the pet to the virtual framebuffer
+    set1 pcon, 0      ; Wait for another interrupt
+    call __movepet
     jmp .game_loop
 
-.sleep:
-    not1 ext, 0
-    jmpf $140
-    jmp .game_loop
+__input:
+    call Get_Input
+    ;mov #Button_A, acc
+    ;call Check_Button_Pressed
+    ;bz 
+    ret
 
 __drawpet:
     ;; This is libperspective drawing
@@ -188,30 +187,17 @@ __drawpet:
     P_Draw_Sprite    pet_spr_addr, pet_x, pet_y
     P_Blit_Screen
     ret
-   
-__pollbuttons:
-    bp p7, 0, .quit     ; When the VMU is plugged into controller, this bit goes high
-    push acc            ; Save acc so we can use it for reading and storing
-    ld v_btn            ; The current set of buttons is now the old set
-    st v_btn_old
-    ld p3               ; Read value of port 3 (buttons)
-    bn acc, 6, .quit    ; Bit 6 is the mode button, it will quit
-    xor #$FF            ; Invert button state, so 1=Pressed 0=Unpressed
-    st v_btn            ; The current set of buttons is now the new set just read
-    xor v_btn_old       ; XOR the new set with the old set, this will give us changed buttons
-    st v_btn_chg
-    pop acc
+
+__movepet:
     ret
+   
 
 ;; Timing stuff in here somewhere
 
 ;; Menu logic in here somewhere
 
-.quit:
-    jmp __goodbye
-
 .include "lib/libperspective.asm"    ; Kresna's lib perspective for fancy sprite drawing macros
-;.include "lib/libkcommon.asm"       ; This has some other definitions for buttons and things, 
+.include "lib/libkcommon.asm"       ; This has some other definitions for buttons and things, 
                                      ;     will check it out later to see if I want to use it	
 
 title1:
