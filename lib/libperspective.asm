@@ -787,7 +787,7 @@ _P_Draw_Sprite_No_Mask:
         ; Use the offset and remainder to calculate if there is an extra byte
         ld      p_spr_size_x_remainder
         add     p_spr_offset_x
-        and     #%11111000
+        ;and     #%11111000   ; THIS WAS REESTED
         ror
         ror
         ror

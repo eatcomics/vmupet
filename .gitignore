@@ -1,0 +1,4 @@
+*.vms
+*.vmi
+*.gif
+build.sh
