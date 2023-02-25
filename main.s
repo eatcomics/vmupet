@@ -18,17 +18,18 @@
 .include "lib/sfr.i"
 
 ;; Game Variables
-pet_x		= $10    ; X position of the pet                1 byte
-pet_y		= $11    ; Y position of the pet                1 byte
-pet_width	= $12    ; Width of pet sprite                  1 byte
-pet_height	= $13    ; Height of pet sprite                 1 byte
-pet_dir         = $14    ; Right = 0, Left = 1                  1 byte
-pet_spr_addr	= $15    ; Location of sprite in memory         2 bytes
+pet_x		 = $10    ; X position of the pet                1 byte
+pet_y		 = $11    ; Y position of the pet                1 byte
+pet_width	 = $12    ; Width of pet sprite                  1 byte
+pet_height	 = $13    ; Height of pet sprite                 1 byte
+pet_dir_horiz    = $14    ; Right = 0, Left = 1                  1 byte
+pet_dir_vert     = $15
+pet_spr_addr	 = $16    ; Location of sprite in memory         2 bytes
 
-time		= $37    ; Time for animation of vpet sprite    ? bytes
-rseed		= $3c    ; RNG seed
+time		 = $37    ; Time for animation of vpet sprite    ? bytes
+rseed		 = $3c    ; RNG seed
 
-title_spr_addr  = $8     ; Location of title in memory          2 bytes
+title_spr_addr   = $8     ; Location of title in memory          2 bytes
 
 ;; Libkcommon uses these
 p3_pressed              =       $4      ; 1 byte
@@ -175,7 +176,8 @@ __main:
     call    Check_Button_Pressed
     bz      .wait_for_start
 
-    mov     #0, pet_dir
+    mov     #0, pet_dir_horiz
+    mov     #0, pet_dir_vert
     mov     #0, pet_x
     mov     #0, pet_y
 
@@ -185,7 +187,8 @@ __main:
     set1 pcon, 0      ; Wait for an intterupt (Timer counts)
     call __drawpet    ; Draw the pet to the virtual framebuffer
     ;set1 pcon, 0      ; Wait for another interrupt
-    call __movepet
+    call __move_pet_horiz
+    call __move_pet_vert
     p_blit_screen
     jmp .game_loop
 
@@ -202,12 +205,10 @@ __drawpet:
     P_Draw_Sprite    pet_spr_addr, pet_x, pet_y 
     ret
 
-__movepet:
-    ;br .mv_vert
-.mv_horiz:
+__move_pet_horiz:
     ; if pet_dir = 0 inc x, if 1 dec x
     push acc
-    ld pet_dir
+    ld pet_dir_horiz
     bnz .mv_left
 .mv_right:
     inc pet_x
@@ -218,7 +219,7 @@ __movepet:
     pop acc
     ret
 .chng_dir_left:
-    set1  pet_dir, 0
+    set1  pet_dir_horiz, 0
     pop acc
     ret
 .mv_left:
@@ -229,14 +230,14 @@ __movepet:
     pop acc
     ret
 .chng_dir_right:
-    clr1  pet_dir, 0
+    clr1  pet_dir_horiz, 0
     pop acc
     ret
 
-.mv_vert:
+__move_pet_vert:
     ; if pet_dir = 0 inc y, if 1 dec y
     push acc
-    ld pet_dir
+    ld pet_dir_vert
     bnz .mv_up
 .mv_down:
     inc pet_y
@@ -247,7 +248,7 @@ __movepet:
     pop acc
     ret
 .chng_dir_up:
-    set1  pet_dir, 0
+    set1  pet_dir_vert, 0
     pop acc
     ret
 .mv_up:
@@ -258,7 +259,7 @@ __movepet:
     pop acc
     ret
 .chng_dir_down:
-    clr1  pet_dir, 0
+    clr1  pet_dir_vert, 0
     pop acc
     ret
 
