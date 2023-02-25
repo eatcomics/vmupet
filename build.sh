@@ -5,7 +5,7 @@ rm vmupet.vmi
 
 if test -f "./vmupet.vms"; then
 	if test -f "vmupet.vmi"; then
-		# ~/evmu/ElysianVMU -b ~/evmu/american.bin -r ~/projects/vmupet/vmupet.vms
+		#~/evmu/ElysianVMU -b ~/evmu/american.bin -r ~/projects/vmupet/vmupet.vms
 		~/evmu/ElysianVMU -r ~/projects/vmupet/vmupet.vms
 	fi
 fi
