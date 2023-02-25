@@ -273,6 +273,6 @@ title1:
     .include sprite "assets/title1.png" ; Waterbear loading up the title screen png
     
 pet_spr: 
-    .include sprite "assets/baby.png"    ; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
+    .include sprite "assets/pet.png"    ; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
 
     .cnop 0, $200    ; Pad binary to an even number of blocks
