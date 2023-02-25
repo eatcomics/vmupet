@@ -1,19 +1,12 @@
 ;;
 ;; main.s
 ;;
-;; version 0.0.1
+;; version 0.3.4
 ;;
 ;; by <eatcomics>
 ;;
 ;; No notes currently
 ;;
-
-;; TODO
-;; Create branch for messing with Kresna's libperspective drawing issue
-;; In main branch stop using libperspective and the other one, just use shiro's input code and drawing code
-;; Move those into their own file along with sleep and quit
-;; Move sprite every frame
-;; Change sprite based on direction and walking
 
 .include "lib/sfr.i"
 
@@ -23,8 +16,12 @@ pet_y		 = $11    ; Y position of the pet                1 byte
 pet_width	 = $12    ; Width of pet sprite                  1 byte
 pet_height	 = $13    ; Height of pet sprite                 1 byte
 pet_dir_horiz    = $14    ; Right = 0, Left = 1                  1 byte
-pet_dir_vert     = $15
-pet_spr_addr	 = $16    ; Location of sprite in memory         2 bytes
+pet_dir_vert     = $15    ; Down = 0, Up = 1
+pet_anim_frame   = $16    ; 0 = 1st frame, 1 = 2nd frame
+pet_spr_r1_addr	 = $17    ; Location of sprite in memory         2 bytes
+pet_spr_r2_addr  = $19
+pet_spr_l1_addr  = $21
+pet_spr_l2_addr  = $23
 
 time		 = $37    ; Time for animation of vpet sprite    ? bytes
 rseed		 = $3c    ; RNG seed
@@ -137,30 +134,68 @@ __main:
     ;; to use indirect addressing, so just keep that in mind when reading the comments below
     ;; 
     ;; This basically just gets a pointer to the sprite data, and sets the height and width of a sprite
-    mov    #<title1, acc       ; Load the lower byte of title1 data from the bank to the accumulator
+    mov    #<title, acc       ; Load the lower byte of title data from the bank to the accumulator
     st     trl                 ; Store that shit in the Table Reference Register lower byte
     st     title_spr_addr      ; Store that in title_spr_addr as well, we'll pass this to LibPerspective to draw
-    mov    #>title1, acc       ; Now we repeat with the high byte of title1
+    mov    #>title, acc       ; Now we repeat with the high byte of title
     st     trh                 ; Store that shit in the Table Reference Register upper byte
     st     title_spr_addr+1    ; Also, store that high byte in the high byte of title_spr_addr
-    xor    acc                 ; Xor acc
-    ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
+;    xor    acc                 ; Xor acc
+;    ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
 
-    mov    #<pet_spr, acc    ; This is all indirect addressing magic, I'll read about
+    mov    #<pet_spr_l1, acc    ; This is all indirect addressing magic, I'll read about
     st     trl               ;     someday soon
-    st     pet_spr_addr
-    mov    #>pet_spr, acc
+    st     pet_spr_l1_addr
+    mov    #>pet_spr_l1, acc
     st     trh
-    st     pet_spr_addr+1
-    xor    acc
-    ldc
-    st     pet_width
-    mov    #1, acc
-    ldc
-    st     pet_height
+    st     pet_spr_l1_addr+1
+;    xor    acc
+;    ldc
+;    st     pet_width
+;    mov    #1, acc
+;    ldc
+;    st     pet_height
+    
+    mov    #<pet_spr_l2, acc    ; This is all indirect addressing magic, I'll read about
+    st     trl               ;     someday soon
+    st     pet_spr_l2_addr
+    mov    #>pet_spr_l2, acc
+    st     trh
+    st     pet_spr_l2_addr+1
+;    xor    acc
+;    ldc
+;    st     pet_width
+;    mov    #1, acc
+;    ldc
+;    st     pet_height
 
-    ;mov #16, pet_width
-    ;mov #16, pet_height
+    mov    #<pet_spr_r1, acc    ; This is all indirect addressing magic, I'll read about
+    st     trl               ;     someday soon
+    st     pet_spr_r1_addr
+    mov    #>pet_spr_r1, acc
+    st     trh
+    st     pet_spr_r1_addr+1
+;    xor    acc
+;    ldc
+;    st     pet_width
+;    mov    #1, acc
+;    ldc
+;    st     pet_height
+
+    mov    #<pet_spr_r2, acc    ; This is all indirect addressing magic, I'll read about
+    st     trl               ;     someday soon
+    st     pet_spr_r2_addr
+    mov    #>pet_spr_r2, acc
+    st     trh
+    st     pet_spr_r2_addr+1
+;    xor    acc
+;    ldc
+;    st     pet_width
+;    mov    #1, acc
+;    ldc
+;    st     pet_height
+
+
 
     ;; Actually draw and render the title sprite
     P_Draw_Background    title_spr_addr
@@ -178,8 +213,9 @@ __main:
 
     mov     #0, pet_dir_horiz
     mov     #0, pet_dir_vert
+    mov     #0, pet_anim_frame
     mov     #0, pet_x
-    mov     #0, pet_y
+    mov     #12, pet_y
 
 .game_loop:
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
@@ -188,7 +224,7 @@ __main:
     call __drawpet    ; Draw the pet to the virtual framebuffer
     ;set1 pcon, 0      ; Wait for another interrupt
     call __move_pet_horiz
-    call __move_pet_vert
+    ;call __move_pet_vert
     p_blit_screen
     jmp .game_loop
 
@@ -201,37 +237,63 @@ __input:
 
 __drawpet:
     ;; This is libperspective drawing
-    P_Fill_Screen    P_WHITE
-    P_Draw_Sprite    pet_spr_addr, pet_x, pet_y 
+    ;; Use direction and frame to decide what sprite to draw
+    P_Fill_Screen    P_WHITE    ; Fill the screen with white first
+    push acc
+    ld pet_dir_horiz
+    bnz .anim_left1
+.anim_right1:
+    ld               pet_anim_frame
+    bnz              .anim_right2
+    mov              #1, pet_anim_frame
+    P_Draw_Sprite    pet_spr_r1_addr, pet_x, pet_y
+    pop              acc
+    ret
+.anim_right2:
+    mov              #0, pet_anim_frame
+    P_Draw_Sprite    pet_spr_r2_addr, pet_x, pet_y
+    pop              acc
+    ret
+.anim_left1:
+    ld               pet_anim_frame
+    bnz              .anim_left2
+    mov              #1, pet_anim_frame
+    P_Draw_Sprite    pet_spr_l1_addr, pet_x, pet_y
+    pop              acc
+    ret
+.anim_left2:
+    mov              #0, pet_anim_frame
+    P_Draw_Sprite    pet_spr_l2_addr, pet_x, pet_y 
+    pop              acc
     ret
 
 __move_pet_horiz:
     ; if pet_dir = 0 inc x, if 1 dec x
-    push acc
-    ld pet_dir_horiz
-    bnz .mv_left
+    push    acc
+    ld      pet_dir_horiz
+    bnz     .mv_left
 .mv_right:
-    inc pet_x
+    inc    pet_x
     ; if pet_x >= 32
     ld     pet_x   
     sub    #32
-    bz    .chng_dir_left
-    pop acc
+    bz     .chng_dir_left
+    pop    acc
     ret
 .chng_dir_left:
-    set1  pet_dir_horiz, 0
-    pop acc
+    set1    pet_dir_horiz, 0
+    pop     acc
     ret
 .mv_left:
-    dec pet_x
+    dec     pet_x
     ; if pet_x <= 0 
-    ld     pet_x   
-    bz    .chng_dir_right
-    pop acc
+    ld      pet_x   
+    bz      .chng_dir_right
+    pop     acc
     ret
 .chng_dir_right:
-    clr1  pet_dir_horiz, 0
-    pop acc
+    clr1    pet_dir_horiz, 0
+    pop     acc
     ret
 
 __move_pet_vert:
@@ -263,16 +325,20 @@ __move_pet_vert:
     pop acc
     ret
 
-
-
 .include "lib/libperspective.asm"    ; Kresna's lib perspective for fancy sprite drawing macros
-.include "lib/libkcommon.asm"       ; This has some other definitions for buttons and things, 
-                                     ;     will check it out later to see if I want to use it	
+.include "lib/libkcommon.asm"        ; Kresna's lib for buttons and sleep/mode exit
 
-title1:
+title:
     .include sprite "assets/title.png" ; Waterbear loading up the title screen png
     
-pet_spr: 
-    .include sprite "assets/pet.png"    ; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
+; Waterbear is cool and will import sprites in the format Kresna's LibPerspective uses
+pet_spr_l1: 
+    .include sprite "assets/baby1.png"
+pet_spr_l2:
+    .include sprite "assets/baby2.png"
+pet_spr_r1:
+    .include sprite "assets/baby3.png"
+pet_spr_r2:
+    .include sprite "assets/baby4.png"
 
     .cnop 0, $200    ; Pad binary to an even number of blocks
