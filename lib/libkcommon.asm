@@ -23,28 +23,26 @@ Get_Input:
         ld      p3
         bn      acc, 6, .quit
         bn      acc, 7, .sleep
+.return_from_sleep:
         st      p3_last_input
         xor     #%11111111
         and     c
         xor     #%11111111
         st      p3_pressed
         ret
-.quit
-        jmpf    goodbye
-.sleep
-        mov     #0, t1cnt               ; Disable audio
-        set1    pcon, 0                 ; Activate HALT mode (saves power)
-        bn      p3, 7, .sleep           ; wait until Sleep Key is released
-        mov     #0,vccr                 ; turn off LCD
-.sleepmore
-        set1    pcon,0                  ; activate HALT mode (saves power)
-        bp      p7, 0, .quit            ; Docked?
-        bp      p3, 7, .sleepmore       ; no Sleep Key pressed yet
-        mov     #$80, vccr              ; turn on LCD again
+.quit:
+        jmpf    __goodbye
+.sleep:
+	bn p3, 7, .sleep        ; Wait for SLEEP to be depressed
+	mov #0, vccr            ; Blank LCD
+.sleepmore:
+	set1 pcon,0             ; Enter HALT mode
+	bp p7, 0, .quit	        ; Docked?
+	bp p3, 7, .sleepmore    ; No SLEEP press yet
+	mov #$80, vccr	        ; Reenable LCD
 .waitsleepup:
-        set1    pcon,0                  ; activate HALT modus (saves power)
-        bn      p3,7,.waitsleepup
-        ret
+	bn p3, 7, .waitsleepup  ; Wait for SLEEP to be depressed
+	br .return_from_sleep   ; I find branching here, instead of back to the top of get input works better  
 
 Check_Button_Pressed:
         ;----------------------------------------------------------------------

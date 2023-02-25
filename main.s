@@ -18,11 +18,12 @@
 .include "lib/sfr.i"
 
 ;; Game Variables
-pet_x		= $16    ; X position of the pet                1 byte
+pet_x		= $10    ; X position of the pet                1 byte
 pet_y		= $11    ; Y position of the pet                1 byte
 pet_width	= $12    ; Width of pet sprite                  1 byte
 pet_height	= $13    ; Height of pet sprite                 1 byte
-pet_spr_addr	= $14    ; Location of sprite in memory         2 bytes
+pet_dir         = $14    ; Right = 0, Left = 1                  1 byte
+pet_spr_addr	= $15    ; Location of sprite in memory         2 bytes
 
 time		= $37    ; Time for animation of vpet sprite    ? bytes
 rseed		= $3c    ; RNG seed
@@ -79,9 +80,9 @@ __time1int:
     reti
 
     .org $1F0    ; Firmware entry vector - Leave game mode
-goodbye:
+__goodbye:
     not1    ext, 0
-    jmpf    goodbye
+    jmpf    __goodbye
 
 ;; VMS File Header
     .org    $200                ; Header starts at $200 for games
@@ -98,26 +99,33 @@ __main:
     mov #$a1, ocr         ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
     mov #$09, mcr         ; Set up Mode Control Register
     mov #$80, vccr        ; Set up LCD Contrast Control Register
-    clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
+    mov #$20, acc
+    push acc
+
+    mov #$ff, p3
+    mov #$80, sp
+    mov #%10000000, ie
+    clr1 psw, 3
+    clr1 psw, 4
+    mov #$05, acc
+    push acc
+
+    mov #$80, p1fcr
+    clr1 p1, 7
+    mov #$80, p1ddr
+    ;clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
     clr1 p1, 7            ; Sets the sound output port
-    mov #$FF, p3          ; p3 are buttons - 0 for pressed 1 for unpressed
 
-;    clr1 psw, 1           ; Create random seed using current date/time of system	
-;    ld $1c
-;    xor $1d
-;    set1 psw,1
-;    st rseed
-
-    ; Indirect addressing time
-    ;; Shiro was using this as a virtual buffer so he could do a frame swap using xram
-    ;clr1    psw, 4
-    ;clr1    psw, 3
-    ;mov     #$82, $2
-    ;mov     #2, xbnk
-    ;st      @R2
+    clr1 psw, 1           ; Create random seed using current date/time of system	
+    ld $1c
+    xor $1d
+    set1 psw,1
+    st rseed
 
 
     set1    ie, 7            ; Reenable interrupts now that hardware is initialized
+
+    mov #%11111111, p3_last_input
 
     call   Get_Input         ; Get the initial button state
 
@@ -145,8 +153,13 @@ __main:
     st     pet_spr_addr+1
     xor    acc
     ldc
-    mov    #16, pet_width
-    mov    #16, pet_height
+    st     pet_width
+    mov    #1, acc
+    ldc
+    st     pet_height
+
+    ;mov #16, pet_width
+    ;mov #16, pet_height
 
     ;; Actually draw and render the title sprite
     P_Draw_Background    title_spr_addr
@@ -154,24 +167,26 @@ __main:
 
 .wait_for_start:
     call    Get_Input
-    clr1    ocr, 5
+    ;clr1    ocr, 5
     
-    set1    ocr, 5
+    ;set1    ocr, 5
     
     mov     #Button_A, acc
     call    Check_Button_Pressed
     bz      .wait_for_start
 
-    mov     #1, pet_x
-    mov     #5, pet_y
+    mov     #0, pet_dir
+    mov     #0, pet_x
+    mov     #0, pet_y
 
 .game_loop:
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
     call __input
     set1 pcon, 0      ; Wait for an intterupt (Timer counts)
     call __drawpet    ; Draw the pet to the virtual framebuffer
-    set1 pcon, 0      ; Wait for another interrupt
+    ;set1 pcon, 0      ; Wait for another interrupt
     call __movepet
+    p_blit_screen
     jmp .game_loop
 
 __input:
@@ -184,17 +199,70 @@ __input:
 __drawpet:
     ;; This is libperspective drawing
     P_Fill_Screen    P_WHITE
-    P_Draw_Sprite    pet_spr_addr, pet_x, pet_y
-    P_Blit_Screen
+    P_Draw_Sprite    pet_spr_addr, pet_x, pet_y 
     ret
 
 __movepet:
+    ;br .mv_vert
+.mv_horiz:
+    ; if pet_dir = 0 inc x, if 1 dec x
+    push acc
+    ld pet_dir
+    bnz .mv_left
+.mv_right:
+    inc pet_x
+    ; if pet_x >= 32
+    ld     pet_x   
+    sub    #32
+    bz    .chng_dir_left
+    pop acc
     ret
-   
+.chng_dir_left:
+    set1  pet_dir, 0
+    pop acc
+    ret
+.mv_left:
+    dec pet_x
+    ; if pet_x <= 0 
+    ld     pet_x   
+    bz    .chng_dir_right
+    pop acc
+    ret
+.chng_dir_right:
+    clr1  pet_dir, 0
+    pop acc
+    ret
 
-;; Timing stuff in here somewhere
+.mv_vert:
+    ; if pet_dir = 0 inc y, if 1 dec y
+    push acc
+    ld pet_dir
+    bnz .mv_up
+.mv_down:
+    inc pet_y
+    ; if pet_y >= 16
+    ld     pet_y  
+    sub    #16
+    bz    .chng_dir_up
+    pop acc
+    ret
+.chng_dir_up:
+    set1  pet_dir, 0
+    pop acc
+    ret
+.mv_up:
+    dec pet_y
+    ; if pet_y <= 0 
+    ld     pet_y  
+    bz    .chng_dir_down
+    pop acc
+    ret
+.chng_dir_down:
+    clr1  pet_dir, 0
+    pop acc
+    ret
 
-;; Menu logic in here somewhere
+
 
 .include "lib/libperspective.asm"    ; Kresna's lib perspective for fancy sprite drawing macros
 .include "lib/libkcommon.asm"       ; This has some other definitions for buttons and things, 
