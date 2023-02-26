@@ -11,20 +11,31 @@
 .include "lib/sfr.i"
 
 ;; Game Variables
-pet_x		 = $10    ; X position of the pet                1 byte
-pet_y		 = $11    ; Y position of the pet                1 byte
-pet_width	 = $12    ; Width of pet sprite                  1 byte
-pet_height	 = $13    ; Height of pet sprite                 1 byte
-pet_dir_horiz    = $14    ; Right = 0, Left = 1                  1 byte
-pet_dir_vert     = $15    ; Down = 0, Up = 1
-pet_anim_frame   = $16    ; 0 = 1st frame, 1 = 2nd frame
-pet_spr_r1_addr	 = $17    ; Location of sprite in memory         2 bytes
-pet_spr_r2_addr  = $19
-pet_spr_l1_addr  = $21
-pet_spr_l2_addr  = $23
+pet_x		      = $10    ; X position of the pet                1 byte
+pet_y		      = $11    ; Y position of the pet                1 byte
+pet_width	      = $12    ; Width of pet sprite                  1 byte
+pet_height	      = $13    ; Height of pet sprite                 1 byte
+pet_dir_horiz         = $14    ; Right = 0, Left = 1                  1 byte
+pet_dir_vert          = $15    ; Down = 0, Up = 1
+pet_anim_frame        = $16    ; 0 = 1st frame, 1 = 2nd frame
+pet_spr_r1_addr	      = $17    ; Location of sprite in memory         2 bytes
+pet_spr_r2_addr       = $19
+pet_spr_l1_addr       = $21
+pet_spr_l2_addr       = $23
+menu_spr_food_addr    = $25
+menu_spr_2_addr       = $27
+menu_spr_3_addr       = $29
 
-time		 = $37    ; Time for animation of vpet sprite    ? bytes
-rseed		 = $3c    ; RNG seed
+;time		 = $37    ; Time for animation of vpet sprite    ? bytes
+;rseed		 = $3c    ; RNG seed
+game_mode        = $40    ; Whether we're looking at pet, in menu, or in a minigame
+menu_sel         = $41
+                          ;   bit 0 = 0, pet mode - 1, menu mode
+			  ;   bit 1 = 1, walk mode
+			  ;   bit 2 = 1, train mode
+			  ;   bit 3 = 1, battle
+			  ;   bit 4 = 1, sound enable/disable
+			  ;   bit 5 = 1, show clock
 
 title_spr_addr   = $8     ; Location of title in memory          2 bytes
 
@@ -114,11 +125,11 @@ __main:
     ;clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
     clr1 p1, 7            ; Sets the sound output port
 
-    clr1 psw, 1           ; Create random seed using current date/time of system	
-    ld $1c
-    xor $1d
-    set1 psw,1
-    st rseed
+;    clr1 psw, 1           ; Create random seed using current date/time of system	
+;    ld $1c
+;    xor $1d
+;    set1 psw,1
+;    st rseed
 
 
     set1    ie, 7            ; Reenable interrupts now that hardware is initialized
@@ -140,8 +151,6 @@ __main:
     mov    #>title, acc       ; Now we repeat with the high byte of title
     st     trh                 ; Store that shit in the Table Reference Register upper byte
     st     title_spr_addr+1    ; Also, store that high byte in the high byte of title_spr_addr
-;    xor    acc                 ; Xor acc
-;    ldc                        ; ldc adds what's in the acc with trl+trh, then writes that address back to acc
 
     mov    #<pet_spr_l1, acc    ; This is all indirect addressing magic, I'll read about
     st     trl               ;     someday soon
@@ -156,45 +165,47 @@ __main:
 ;    ldc
 ;    st     pet_height
     
-    mov    #<pet_spr_l2, acc    ; This is all indirect addressing magic, I'll read about
-    st     trl               ;     someday soon
+    mov    #<pet_spr_l2, acc
+    st     trl
     st     pet_spr_l2_addr
     mov    #>pet_spr_l2, acc
     st     trh
     st     pet_spr_l2_addr+1
-;    xor    acc
-;    ldc
-;    st     pet_width
-;    mov    #1, acc
-;    ldc
-;    st     pet_height
 
-    mov    #<pet_spr_r1, acc    ; This is all indirect addressing magic, I'll read about
-    st     trl               ;     someday soon
+    mov    #<pet_spr_r1, acc
+    st     trl
     st     pet_spr_r1_addr
     mov    #>pet_spr_r1, acc
     st     trh
     st     pet_spr_r1_addr+1
-;    xor    acc
-;    ldc
-;    st     pet_width
-;    mov    #1, acc
-;    ldc
-;    st     pet_height
 
-    mov    #<pet_spr_r2, acc    ; This is all indirect addressing magic, I'll read about
-    st     trl               ;     someday soon
+    mov    #<pet_spr_r2, acc
+    st     trl
     st     pet_spr_r2_addr
     mov    #>pet_spr_r2, acc
     st     trh
     st     pet_spr_r2_addr+1
-;    xor    acc
-;    ldc
-;    st     pet_width
-;    mov    #1, acc
-;    ldc
-;    st     pet_height
 
+    mov    #<menu_spr_food, acc
+    st     trl
+    st     menu_spr_food_addr
+    mov    #>menu_spr_food, acc
+    st     trh
+    st     menu_spr_food_addr+1
+
+    mov    #<menu_spr_2, acc
+    st     trl
+    st     menu_spr_2_addr
+    mov    #>menu_spr_2, acc
+    st     trh
+    st     menu_spr_2_addr+1
+
+    mov    #<menu_spr_3, acc
+    st     trl
+    st     menu_spr_3_addr
+    mov    #>menu_spr_3, acc
+    st     trh
+    st     menu_spr_3_addr+1
 
 
     ;; Actually draw and render the title sprite
@@ -216,29 +227,89 @@ __main:
     mov     #0, pet_anim_frame
     mov     #0, pet_x
     mov     #12, pet_y
+    mov     #0, game_mode
+    mov     #0, menu_sel
 
 .game_loop:
     ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
     call __input
-    set1 pcon, 0      ; Wait for an intterupt (Timer counts)
-    call __drawpet    ; Draw the pet to the virtual framebuffer
-    ;set1 pcon, 0      ; Wait for another interrupt
+    set1 pcon, 0       ; Wait for an intterupt (Timer counts)
+    call __draw        ; Draw things to the virtual framebuffer
     call __move_pet_horiz
-    ;call __move_pet_vert
     p_blit_screen
     jmp .game_loop
 
 __input:
-    call Get_Input
-    ;mov #Button_A, acc
-    ;call Check_Button_Pressed
-    ;bz 
+    call    Get_Input
+    push    acc
+    ld      game_mode
+    bnz     .menu_mode
+.pet_mode:
+    mov     #Button_A, acc
+    call    Check_Button_Pressed
+    bnz     .pet_a_pressed   
+    pop     acc
+    ret
+.pet_a_pressed:
+    set1    game_mode, 0
+    pop     acc
+    ret
+.menu_mode:
+    mov     #Button_B, acc
+    call    Check_Button_Pressed
+    bnz     .menu_b_pressed
+    mov     #Button_Down, acc
+    call    Check_Button_Pressed
+    bnz     .menu_down_pressed
+    mov     #Button_Up, acc
+    call    Check_Button_Pressed
+    bnz     .menu_up_pressed
+    pop     acc
+    ret
+.menu_b_pressed:
+    clr1    game_mode, 0
+    pop     acc
+    ret
+.menu_down_pressed:
+    ld      menu_sel
+    be      #2, .wrap_menu_top
+    inc     menu_sel
+    pop     acc
+    ret
+.wrap_menu_top:
+    clr1    menu_sel, 0
+    clr1    menu_sel, 1
+    pop     acc
+    ret
+.menu_up_pressed:
+    ld      menu_sel
+    be      #0, .wrap_menu_bottom
+    dec     menu_sel
+    pop     acc
+    ret
+.wrap_menu_bottom:
+    clr1    menu_sel, 0
+    set1    menu_sel, 1
+    pop     acc
     ret
 
-__drawpet:
+__draw:
+    P_Fill_Screen    P_WHITE    ; Fill the screen with white first
+    push    acc
+    ld      game_mode
+    bnz      .menu
+.pet:
+    pop acc
+    call    __draw_pet
+    ret
+.menu:
+    pop acc
+    call    __draw_menu
+    ret
+
+__draw_pet:
     ;; This is libperspective drawing
     ;; Use direction and frame to decide what sprite to draw
-    P_Fill_Screen    P_WHITE    ; Fill the screen with white first
     push acc
     ld pet_dir_horiz
     bnz .anim_left1
@@ -264,6 +335,25 @@ __drawpet:
 .anim_left2:
     mov              #0, pet_anim_frame
     P_Draw_Sprite    pet_spr_l2_addr, pet_x, pet_y 
+    pop              acc
+    ret
+
+__draw_menu:
+    push   acc
+    ld     menu_sel
+    bnz    .not_food
+.menu_food:
+    P_Draw_Sprite_Constant    menu_spr_food_addr, 8, 0
+    pop              acc
+    ret
+.not_food:
+    dbnz    acc, .menu3
+.menu2:
+    P_Draw_Sprite_Constant    menu_spr_2_addr, 8, 0
+    pop              acc
+    ret
+.menu3:
+    P_Draw_Sprite_Constant    menu_spr_3_addr, 8, 0
     pop              acc
     ret
 
@@ -340,5 +430,11 @@ pet_spr_r1:
     .include sprite "assets/baby3.png"
 pet_spr_r2:
     .include sprite "assets/baby4.png"
+menu_spr_food:
+    .include sprite "assets/menu_meat.png"
+menu_spr_2:
+    .include sprite "assets/menu1.png"
+menu_spr_3:
+    .include sprite "assets/menu_blank.png"
 
     .cnop 0, $200    ; Pad binary to an even number of blocks

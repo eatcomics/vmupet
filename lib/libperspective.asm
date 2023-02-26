@@ -309,8 +309,12 @@ P_BLACK                 EQU     $FF
         ; Preload RAM
         mov     #%spr_x, p_spr_x
         mov     #%spr_y, p_spr_y
-        mov     #<%spr_addr, trl
-        mov     #>%spr_addr, trh
+	ld      %spr_addr
+	st      trl
+	ld      %spr_addr+1
+	st      trh
+;        mov     #<%spr_addr, trl
+;        mov     #>%spr_addr, trh
         call    _P_Draw_Sprite_No_Mask
 %end
 
