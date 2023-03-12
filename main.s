@@ -8,7 +8,7 @@
 ;; No notes currently
 ;;
 
-.include "lib/sfr.i"
+.include "libperspective/sfr.i"
 
 ;; Game Variables
 pet_x		      = $10    ; X position of the pet                1 byte
@@ -415,8 +415,8 @@ __move_pet_vert:
     pop acc
     ret
 
-.include "lib/libperspective.asm"    ; Kresna's lib perspective for fancy sprite drawing macros
-.include "lib/libkcommon.asm"        ; Kresna's lib for buttons and sleep/mode exit
+.include "libperspective/libperspective.asm"    ; Kresna's lib perspective for fancy sprite drawing macros
+.include "libperspective/libkcommon.asm"        ; Kresna's lib for buttons and sleep/mode exit
 
 title:
     .include sprite "assets/title.png" ; Waterbear loading up the title screen png

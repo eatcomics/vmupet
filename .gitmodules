@@ -1,0 +1,3 @@
+[submodule "libperspective"]
+	path = libperspective
+	url = https://github.com/eatcomics/libperspective.git
