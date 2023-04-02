@@ -1,7 +1,7 @@
 ;;
 ;; main.s
 ;;
-;; version 0.3.4
+;; version 0.3.7 // Adding time functionality and pet evolution
 ;;
 ;; by <eatcomics>
 ;;
@@ -11,39 +11,42 @@
 .include "libperspective/sfr.i"
 
 ;; Game Variables
-pet_x		      = $10    ; X position of the pet                1 byte
-pet_y		      = $11    ; Y position of the pet                1 byte
-pet_width	      = $12    ; Width of pet sprite                  1 byte
-pet_height	      = $13    ; Height of pet sprite                 1 byte
-pet_dir_horiz         = $14    ; Right = 0, Left = 1                  1 byte
-pet_dir_vert          = $15    ; Down = 0, Up = 1
-pet_anim_frame        = $16    ; 0 = 1st frame, 1 = 2nd frame
-pet_spr_r1_addr	      = $17    ; Location of sprite in memory         2 bytes
-pet_spr_r2_addr       = $19
-pet_spr_l1_addr       = $21
-pet_spr_l2_addr       = $23
-menu_spr_food_addr    = $25
-menu_spr_2_addr       = $27
-menu_spr_3_addr       = $29
+;; Some of these should maybe be broken into bits to save memory? I'm not tight for it, but you never know
+title_spr_addr      = $8     ; Location of title in memory                   2 bytes
+pet_x               = $10    ; X position of the pet                         1 byte
+pet_y               = $11    ; Y position of the pet                         1 byte
+pet_width           = $12    ; Width of pet sprite                           1 byte
+pet_height          = $13    ; Height of pet sprite                          1 byte
+pet_dir_horiz       = $14    ; Right = 0, Left = 1                           1 byte
+pet_dir_vert        = $15    ; Down = 0, Up = 1                              1 byte
+pet_anim_frame      = $16    ; 0 = 1st frame, 1 = 2nd frame                  1 byte
+pet_spr_r1_addr     = $17    ; Location of right1 sprite in memory           2 bytes
+pet_spr_r2_addr     = $19    ; Location of right2 sprite                     2 bytes
+pet_spr_l1_addr     = $21    ; Location of left1 sprite                      2 bytes
+pet_spr_l2_addr     = $23    ; Location of left2 sprite                      2 bytes
+menu_spr_food_addr  = $25    ; Food menu icon                                2 bytes
+menu_spr_2_addr     = $27    ; Placeholder menu 2 sprite                     2 bytes
+menu_spr_3_addr     = $29    ; Placeholder menu 3 sprite                     2 bytes
 
-;time		 = $37    ; Time for animation of vpet sprite    ? bytes
-;rseed		 = $3c    ; RNG seed
-game_mode        = $40    ; Whether we're looking at pet, in menu, or in a minigame
-menu_sel         = $41
-                          ;   bit 0 = 0, pet mode - 1, menu mode
-			  ;   bit 1 = 1, walk mode
-			  ;   bit 2 = 1, train mode
-			  ;   bit 3 = 1, battle
-			  ;   bit 4 = 1, sound enable/disable
-			  ;   bit 5 = 1, show clock
+last_time  = $37  ; The stored time                                          1 byte
+cur_time   = $38  ; Hold what the actual current time is                     1 byte
+rseed      = $3c  ; RNG seed                                                 1 byte
+game_mode  = $40  ; Whether we're looking at pet, in menu, or in a minigame  1 byte
+menu_sel   = $41  ; The below is dumb, probably, also the name is not good   1 byte
+                  ;   all bits 0 = pet mode
+                  ;   bit 0 = 1, menu mode
+                  ;   bit 1 = 1, walk mode
+                  ;   bit 2 = 1, train mode
+                  ;   bit 3 = 1, battle
+                  ;   bit 4 = 1, sound enable/disable
+                  ;   bit 5 = 1, show clock
 
-title_spr_addr   = $8     ; Location of title in memory          2 bytes
-
-;; Libkcommon uses these
+;; Libkcommon uses these for input
 p3_pressed              =       $4      ; 1 byte
 p3_last_input           =       $5      ; 1 byte
 
 ;; Reset and interrupt vectors
+;; I'll comment this in more detail later
     .org $00        ; Reset Vector
     jmpf __main     ; Jump to vmupet entry point
     
@@ -94,24 +97,24 @@ __goodbye:
     jmpf    __goodbye
 
 ;; VMS File Header
-    .org    $200                ; Header starts at $200 for games
-    .text   16 "VMUPet"         ; 16 bytes for file description
-    .text   32 "VMUPet for VMU"	; 32 bytes of file description (for dreamcast)
-    .string 16 ""               ; Identifier of application that created the file (we don't need it)
+    .org    $200                 ; Header starts at $200 for games
+    .text   16 "VMUPet"          ; 16 bytes for file description
+    .text   32 "VMUPet for VMU"  ; 32 bytes of file description (for dreamcast)
+    .string 16 ""                ; Identifier of application that created the file (we don't need it)
 
     .include icon "./assets/icon.png" ; Waterbear handles this nicely, nice clean code for us!
 
 ;; Finally our game code! Main entry point
-    .org   $54B	          ; Main starts at $54B if you have one title screen, $680 if two
+    .org   $54B     ; Main starts at $54B if you have one title screen, $680 if two
 __main:
-    clr1 ie, 7            ; Disable interrupts until hardware is initialized
-    mov #$a1, ocr         ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
-    mov #$09, mcr         ; Set up Mode Control Register
-    mov #$80, vccr        ; Set up LCD Contrast Control Register
+    clr1 ie, 7      ; Disable interrupts until hardware is initialized
+    mov #$a1, ocr   ; Set up OCR, I don't know if this is what I want or not REVIEW THIS LATER
+    mov #$09, mcr   ; Set up Mode Control Register
+    mov #$80, vccr  ; Set up LCD Contrast Control Register
     mov #$20, acc
     push acc
 
-    mov #$ff, p3
+    ;; When I'm less lazy I need to comment the below (I don't feel like reading the documentation to make sure I'm accurate)
     mov #$80, sp
     mov #%10000000, ie
     clr1 psw, 3
@@ -122,49 +125,46 @@ __main:
     mov #$80, p1fcr
     clr1 p1, 7
     mov #$80, p1ddr
-    ;clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press
+    clr1 p3int, 0         ; Clear bit 0 in p3int - For interrupts on button press (I may reenable this, and switch to using interrupts for button presses
+                          ;  as opposed to what libkcommon is doing. I have yet to decide
     clr1 p1, 7            ; Sets the sound output port
 
-;    clr1 psw, 1           ; Create random seed using current date/time of system	
-;    ld $1c
-;    xor $1d
-;    set1 psw,1
-;    st rseed
+    clr1 psw, 1           ; Create random seed using current date/time of system
+    ld $1c                ; this is stolen, and I need to figure out where exactly time is stored (I assume $1c and $1d :P
+    xor $1d               ; Xor 1c and 1d, which I assume one is date, one is time?
+    set1 psw,1            ; set bit 1 of psw
+    st rseed              ; st the result in rseed
 
-
-    set1    ie, 7            ; Reenable interrupts now that hardware is initialized
-
-    mov #%11111111, p3_last_input
-
-    call   Get_Input         ; Get the initial button state
+    set1   ie, 7                      ; Reenable interrupts now that hardware is initialized
+    mov    #%11111111, p3_last_input  ; Prepare p3_last_input before calling Get_Input
+    call   Get_Input                  ; Get the initial button state
 
     ;; Here is where we'll draw the title screen, then we'll wait for a button press and jump to the real game loop
-    ;;;;;; Since this is the first time we're running into this, let's break it down, sexual style
-    ;; The VMU is wierd, and because of a bunch of nonsense with it, it uses 9 bits for addressing, it's a whole thing
-    ;; So because of that, there's some magic with things called banks. And to utilize this wonderful 9 bit addressing you have
-    ;; to use indirect addressing, so just keep that in mind when reading the comments below
-    ;; 
-    ;; This basically just gets a pointer to the sprite data, and sets the height and width of a sprite
-    mov    #<title, acc       ; Load the lower byte of title data from the bank to the accumulator
-    st     trl                 ; Store that shit in the Table Reference Register lower byte
-    st     title_spr_addr      ; Store that in title_spr_addr as well, we'll pass this to LibPerspective to draw
-    mov    #>title, acc       ; Now we repeat with the high byte of title
-    st     trh                 ; Store that shit in the Table Reference Register upper byte
-    st     title_spr_addr+1    ; Also, store that high byte in the high byte of title_spr_addr
+    mov    #<title, acc      ; Load the lower byte of title data from the bank to the accumulator
+    st     trl               ; Store that shit in the Table Reference Register lower byte
+    st     title_spr_addr    ; Store that in title_spr_addr as well, we'll pass this to LibPerspective to draw
+    mov    #>title, acc      ; Now we repeat with the high byte of title
+    st     trh               ; Store that shit in the Table Reference Register upper byte
+    st     title_spr_addr+1  ; Also, store that high byte in the high byte of title_spr_addr
 
-    mov    #<pet_spr_l1, acc    ; This is all indirect addressing magic, I'll read about
-    st     trl               ;     someday soon
+    ;;; We just do more of the above, but this time for the other sprites
+    ;; This is the left facing sprite (frame 1)
+    mov    #<pet_spr_l1, acc
+    st     trl
     st     pet_spr_l1_addr
     mov    #>pet_spr_l1, acc
     st     trh
     st     pet_spr_l1_addr+1
+;;;  The below is for automatically setting the sprite width and height, I will probably be using it later, so left it in
+;;;  I believe it's only commented because I was testing for an issue with Libperspective
 ;    xor    acc
 ;    ldc
 ;    st     pet_width
 ;    mov    #1, acc
 ;    ldc
 ;    st     pet_height
-    
+
+    ;; This is the left facing sprite (frame 2)
     mov    #<pet_spr_l2, acc
     st     trl
     st     pet_spr_l2_addr
@@ -172,6 +172,7 @@ __main:
     st     trh
     st     pet_spr_l2_addr+1
 
+    ;; This is the right facing sprite (frame 1)
     mov    #<pet_spr_r1, acc
     st     trl
     st     pet_spr_r1_addr
@@ -179,6 +180,7 @@ __main:
     st     trh
     st     pet_spr_r1_addr+1
 
+    ;; This is the right facing sprite (frame 2)
     mov    #<pet_spr_r2, acc
     st     trl
     st     pet_spr_r2_addr
@@ -186,6 +188,7 @@ __main:
     st     trh
     st     pet_spr_r2_addr+1
 
+    ;; Food menu icon sprite
     mov    #<menu_spr_food, acc
     st     trl
     st     menu_spr_food_addr
@@ -193,6 +196,7 @@ __main:
     st     trh
     st     menu_spr_food_addr+1
 
+    ;; Placeholder second menu item icon
     mov    #<menu_spr_2, acc
     st     trl
     st     menu_spr_2_addr
@@ -200,6 +204,7 @@ __main:
     st     trh
     st     menu_spr_2_addr+1
 
+    ;; Placeholder third menu item icon
     mov    #<menu_spr_3, acc
     st     trl
     st     menu_spr_3_addr
@@ -213,92 +218,92 @@ __main:
     P_Blit_Screen
 
 .wait_for_start:
-    call    Get_Input
-    ;clr1    ocr, 5
+    call    Get_Input       
+    clr1    ocr, 5
     
-    ;set1    ocr, 5
+    set1    ocr, 5
     
-    mov     #Button_A, acc
-    call    Check_Button_Pressed
-    bz      .wait_for_start
+    mov     #Button_A, acc        ; Put the A button in the accumulator
+    call    Check_Button_Pressed  ; Call Libkcommon Check_Button_Pressed and see if A is pressed
+    bz      .wait_for_start       ; If it's not pressed, we just loop until it is
 
-    mov     #0, pet_dir_horiz
-    mov     #0, pet_dir_vert
-    mov     #0, pet_anim_frame
-    mov     #0, pet_x
-    mov     #12, pet_y
-    mov     #0, game_mode
-    mov     #0, menu_sel
+    ;; Initialize some variables
+    mov     #0, pet_dir_horiz     ; Set the pet to be moving right  
+    mov     #0, pet_dir_vert      ; This is here for moving the pet up and down (currently unused)
+    mov     #0, pet_anim_frame    ; Which frame of the animation the pet is on
+    mov     #0, pet_x             ; X location of pet on screen
+    mov     #12, pet_y            ; Y location of pet on screen
+    mov     #0, game_mode         ; Whether we're in the main idle pet screen, or in a menu, or on a walk, etc. 
+    mov     #0, menu_sel          ; Which menu selection you're on
 
 .game_loop:
-    ;;;;; Here there will be a bunch of logic and shiz for the animations, but for now we'll just draw the pet sprite
-    call __input
-    set1 pcon, 0       ; Wait for an intterupt (Timer counts)
-    call __draw        ; Draw things to the virtual framebuffer
-    call __move_pet_horiz
-    p_blit_screen
-    jmp .game_loop
+    call __input           ; Check for input
+    set1 pcon, 0           ; Wait for an intterupt (Timer counts)
+    call __draw            ; Draw things to the virtual framebuffer
+    call __move_pet_horiz  ; Make the pet move
+    p_blit_screen          ; Draw the screen
+    jmp .game_loop         ; Loop!
 
 __input:
-    call    Get_Input
-    push    acc
-    ld      game_mode
-    bnz     .menu_mode
+    call    Get_Input      ; Libkcommon check input
+    push    acc            ; Push the accumulator
+    ld      game_mode      ; Store game mode in acc
+    bnz     .menu_mode     ; if acc isn't zero, go to menu mode
 .pet_mode:
-    mov     #Button_A, acc
-    call    Check_Button_Pressed
-    bnz     .pet_a_pressed   
-    pop     acc
+    mov     #Button_A, acc        ; We want to check for the A button
+    call    Check_Button_Pressed  ; Actually check it (Libkcommon)
+    bnz     .pet_a_pressed        ; If it's pressed, go to .pet_a_pressed
+    pop     acc                   ; If it's not pressed, return to the main loop
     ret
 .pet_a_pressed:
-    set1    game_mode, 0
-    pop     acc
+    set1    game_mode, 0          ; Got to set the game_mode to menu
+    pop     acc                   ; Then return to the main loop
     ret
 .menu_mode:
-    mov     #Button_B, acc
-    call    Check_Button_Pressed
-    bnz     .menu_b_pressed
-    mov     #Button_Down, acc
-    call    Check_Button_Pressed
-    bnz     .menu_down_pressed
-    mov     #Button_Up, acc
+    mov     #Button_B, acc        ; While in menu mode, we need to check B
+    call    Check_Button_Pressed  ; Actually check it (Libkcommon)
+    bnz     .menu_b_pressed       ; If it was call the .menu_b_pressed logic
+    mov     #Button_Down, acc     ; Now we want to check if down was pressed
+    call    Check_Button_Pressed  ; Actually check it
+    bnz     .menu_down_pressed    ; If it was call the .menu_down_pressed logic
+    mov     #Button_Up, acc       ; And repeat for up
     call    Check_Button_Pressed
     bnz     .menu_up_pressed
-    pop     acc
+    pop     acc                   ; Nothing pressed, just ret to main loop
     ret
 .menu_b_pressed:
-    clr1    game_mode, 0
-    pop     acc
+    clr1    game_mode, 0          ; B was pressed, so we need to exit menu mode
+    pop     acc                   ; Then ret to main loop
     ret
 .menu_down_pressed:
-    ld      menu_sel
-    be      #2, .wrap_menu_top
-    inc     menu_sel
-    pop     acc
+    ld      menu_sel              ; Load the current menu selection into acc
+    be      #2, .wrap_menu_top    ; If we're at the bottom, we need to wrap to the top
+    inc     menu_sel              ; Otherwise, we just increment the menu selection
+    pop     acc                   ; Return to the main loop
     ret
 .wrap_menu_top:
-    clr1    menu_sel, 0
+    clr1    menu_sel, 0           ; Clear both bits of menu_sel
     clr1    menu_sel, 1
-    pop     acc
+    pop     acc                   ; Return to the main loop
     ret
 .menu_up_pressed:
-    ld      menu_sel
+    ld      menu_sel              ; Same as down pressed, just in reverse
     be      #0, .wrap_menu_bottom
     dec     menu_sel
     pop     acc
     ret
 .wrap_menu_bottom:
-    clr1    menu_sel, 0
-    set1    menu_sel, 1
-    pop     acc
+    clr1    menu_sel, 0           ; This time, instead of clearing both bits
+    set1    menu_sel, 1           ; we just set bit 2, because 2 is the 3rd menu item (0, 1, 2)
+    pop     acc                   ; Return to the main loop
     ret
 
 __draw:
     P_Fill_Screen    P_WHITE    ; Fill the screen with white first
-    push    acc
-    ld      game_mode
-    bnz      .menu
-.pet:
+    push    acc                 ; Store the acc
+    ld      game_mode           ; Check current game mode
+    bnz      .menu              ; If game_mode isn't zero, we need to draw the menu
+.pet:                           ; If game_mode is zero, we draw the pet
     pop acc
     call    __draw_pet
     ret
@@ -307,6 +312,8 @@ __draw:
     call    __draw_menu
     ret
 
+;; The bellow is all just calling Libperspective with the right frames
+;; Pretty straightforward (I should probaby make sure I'm pushing and popping everything correctly here, but I'm lazy)
 __draw_pet:
     ;; This is libperspective drawing
     ;; Use direction and frame to decide what sprite to draw
