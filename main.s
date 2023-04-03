@@ -130,8 +130,8 @@ __main:
     clr1 p1, 7            ; Sets the sound output port
 
     clr1 psw, 1           ; Create random seed using current date/time of system
-    ld $1c                ; this is stolen, and I need to figure out where exactly time is stored (I assume $1c and $1d :P
-    xor $1d               ; Xor 1c and 1d, which I assume one is date, one is time?
+    ld $1c                ; load the hours into acc
+    xor $1d               ; Xor 1c and 1d, 001C is Minutes, 001D is hours
     set1 psw,1            ; set bit 1 of psw
     st rseed              ; st the result in rseed
 
