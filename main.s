@@ -27,19 +27,24 @@ pet_spr_l2_addr     = $23    ; Location of left2 sprite                      2 b
 menu_spr_food_addr  = $25    ; Food menu icon                                2 bytes
 menu_spr_2_addr     = $27    ; Placeholder menu 2 sprite                     2 bytes
 menu_spr_3_addr     = $29    ; Placeholder menu 3 sprite                     2 bytes
+evo1_spr_addr       = $31    ; Temp first evolution sprite                   2 bytes
+evo2_spr_addr       = $33    ; Temp second evo sprite                        2 bytes
 
-last_time  = $37  ; The stored time                                          1 byte
-cur_time   = $38  ; Hold what the actual current time is                     1 byte
-rseed      = $3c  ; RNG seed                                                 1 byte
-game_mode  = $40  ; Whether we're looking at pet, in menu, or in a minigame  1 byte
-menu_sel   = $41  ; The below is dumb, probably, also the name is not good   1 byte
-                  ;   all bits 0 = pet mode
-                  ;   bit 0 = 1, menu mode
-                  ;   bit 1 = 1, walk mode
-                  ;   bit 2 = 1, train mode
-                  ;   bit 3 = 1, battle
-                  ;   bit 4 = 1, sound enable/disable
-                  ;   bit 5 = 1, show clock
+last_time   = $37  ; The stored time                                          1 byte
+cur_time    = $38  ; Hold what the actual current time is                     1 byte
+pet_age_min = $42  ; Think this is how I'll gauge evos                        1 byte
+pet_age_hr  = $43  ; I think minute and hour is enough, may need day?         1 byte
+evolution   = $44  ; Current evolution, 0, 1, 2,or 3                          1 byte
+rseed       = $3c  ; RNG seed                                                 1 byte
+game_mode   = $40  ; Whether we're looking at pet, in menu, or in a minigame  1 byte
+menu_sel    = $41  ; The below is dumb, probably, also the name is not good   1 byte
+                   ;   all bits 0 = pet mode
+                   ;   bit 0 = 1, menu mode
+                   ;   bit 1 = 1, walk mode
+                   ;   bit 2 = 1, train mode
+                   ;   bit 3 = 1, battle
+                   ;   bit 4 = 1, sound enable/disable
+                   ;   bit 5 = 1, show clock
 
 ;; Libkcommon uses these for input
 p3_pressed              =       $4      ; 1 byte
@@ -188,6 +193,22 @@ __main:
     st     trh
     st     pet_spr_r2_addr+1
 
+    ;; Pet evo 1 sprite (no animation at the moment)
+    mov    #<pet_spr_evo1, acc
+    st     trl
+    st     evo1_spr_addr
+    mov    #>pet_spr_evo1, acc
+    st     trh
+    st     evo1_spr_addr+1
+
+    ;; Pet evo 2 sprite (no animation)
+    mov    #<pet_spr_evo2, acc
+    st     trl
+    st     evo2_spr_addr
+    mov    #>pet_spr_evo2, acc
+    st     trh
+    st     evo2_spr_addr+1
+
     ;; Food menu icon sprite
     mov    #<menu_spr_food, acc
     st     trl
@@ -241,6 +262,7 @@ __main:
     set1 pcon, 0           ; Wait for an intterupt (Timer counts)
     call __draw            ; Draw things to the virtual framebuffer
     call __move_pet_horiz  ; Make the pet move
+    call __update_pet      ; Updates pet attributes, age, health, evolution, all those things
     p_blit_screen          ; Draw the screen
     jmp .game_loop         ; Loop!
 
@@ -422,6 +444,10 @@ __move_pet_vert:
     pop acc
     ret
 
+__update_pet:
+    ;; Gonna be a bunch of stuff with time in here
+    ret
+
 .include "libperspective/libperspective.asm"    ; Kresna's lib perspective for fancy sprite drawing macros
 .include "libperspective/libkcommon.asm"        ; Kresna's lib for buttons and sleep/mode exit
 
@@ -437,6 +463,10 @@ pet_spr_r1:
     .include sprite "assets/baby3.png"
 pet_spr_r2:
     .include sprite "assets/baby4.png"
+pet_spr_evo1:
+    .include sprite "assets/pet.png"
+pet_spr_evo2:
+    .include sprite "assets/octopus.png"
 menu_spr_food:
     .include sprite "assets/menu_meat.png"
 menu_spr_2:
