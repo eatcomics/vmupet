@@ -12,7 +12,8 @@ A v-pet for the Sega VMU
 
 ## Current To Do
 - Finish evolution and time code
-- Clean up code, separate libperspective as git submodule
+- (done) separate libperspective as git submodule
+- Clean up code
 - test random numbers
 - Set up sleep interrupts for important events, and make sure time is updating in sleep
 - Add care/feeding
