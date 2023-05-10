@@ -10,10 +10,12 @@ A v-pet for the Sega VMU
 - (done) Add a menu for feeding and training
 - (done) Title screen
 
-## Current Todo
+## Current To Do
+- Finish evolution and time code
 - Clean up code, separate libperspective as git submodule
-- Get time working, test random numbers
-- Add care/feeding to test progression and evolution
+- test random numbers
+- Set up sleep interrupts for important events, and make sure time is updating in sleep
+- Add care/feeding
 - Add monster sounds
 - Get artwork done for 1 line of evo's and create a second monster that's a plant
 
